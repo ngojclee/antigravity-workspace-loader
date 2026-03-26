@@ -88,6 +88,9 @@ export class WorkspaceManagerPanel {
                     case 'openSettings':
                         vscode.commands.executeCommand('workbench.action.openSettings', 'antigravityWorkspace');
                         return;
+                    case 'saveCurrentTo':
+                        this.saveCurrentTo(message.fileName);
+                        return;
                 }
             },
             null,
@@ -227,22 +230,26 @@ export class WorkspaceManagerPanel {
                         try {
                             const workspaceFilePath = path.join(workspacesDir, file);
                             const content = fs.readFileSync(workspaceFilePath, 'utf8');
-                            // Parse simple JSON (jsonc-parser handles comments safely, but we'll strip basic things if needed. We use JSON.parse for simplicity here, assuming our own generation)
-                            // Better yet, just regex extract folders or use the same package JSON parse if imported.
                             
-                            // For simplicity using primitive extraction or requiring strict JSON:
                             const data = require('jsonc-parser').parse(content);
                             if (data.folders) {
-                                // Resolve to absolute paths for copying
                                 const absolutePaths = data.folders.map((f: any) => {
                                     if (!f.path) return '';
                                     if (path.isAbsolute(f.path)) return f.path;
                                     return path.resolve(workspacesDir, f.path);
                                 }).filter((p: string) => p !== '');
                                 
+                                const copyPaths = absolutePaths.filter((p: string) => {
+                                    return !defaultDirs.some(dir => {
+                                        const defaultFullPath = path.join(mainProjectRoot, dir);
+                                        return path.normalize(p) === path.normalize(defaultFullPath);
+                                    });
+                                });
+
                                 workspaces.push({
                                     fileName: file,
-                                    paths: absolutePaths
+                                    paths: absolutePaths,
+                                    copyPaths: copyPaths
                                 });
                             }
                         } catch (e) {
@@ -265,6 +272,43 @@ export class WorkspaceManagerPanel {
             }
         });
     }
+
+    private async saveCurrentTo(fileName: string) {
+        const config = vscode.workspace.getConfiguration('antigravityWorkspace');
+        const mainProjectRoot = config.get<string>('mainProjectRoot');
+        if (!mainProjectRoot) return;
+        const workspacesDir = path.join(mainProjectRoot, '.workspaces');
+        const targetPath = path.join(workspacesDir, fileName);
+        
+        const currentFolders = vscode.workspace.workspaceFolders;
+        if (!currentFolders || currentFolders.length === 0) {
+            void vscode.window.showInformationMessage('No folders currently open in workspace to save.');
+            return;
+        }
+
+        const overwrite = await vscode.window.showWarningMessage(
+            `Overwrite "${fileName}" with current open folders?`,
+            { modal: true },
+            'Yes'
+        );
+        if (overwrite !== 'Yes') return;
+
+        const foldersData = currentFolders.map(f => {
+            let folderPath = f.uri.fsPath;
+            if (folderPath.startsWith(mainProjectRoot)) {
+                folderPath = path.relative(mainProjectRoot, folderPath);
+                folderPath = folderPath.replace(/\\/g, '/');
+            }
+            return { path: folderPath };
+        });
+
+        const workspaceJson = { folders: foldersData, settings: {} };
+        fs.writeFileSync(targetPath, JSON.stringify(workspaceJson, null, 4));
+        vscode.window.showInformationMessage(`Workspace saved successfully to ${fileName}`);
+        this.refreshData();
+    }
+
+
 
     public dispose() {
         WorkspaceManagerPanel.currentPanel = undefined;
@@ -374,6 +418,7 @@ export class WorkspaceManagerPanel {
                             <h3>Saved Workspaces</h3>
                             <button id="create-ws-btn"><b>+</b> Create New Workspace</button>
                         </div>
+                        <input type="text" id="search-box" placeholder="Search saved workspaces by name..." style="width: 100%; box-sizing: border-box; margin-bottom: 15px; padding: 8px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 4px;">
                         <div id="workspaces-list">
                             Loading workspaces...
                         </div>
@@ -429,6 +474,7 @@ export class WorkspaceManagerPanel {
                         data.workspaces.forEach(ws => {
                             const wsDiv = document.createElement('div');
                             wsDiv.className = 'workspace-item';
+                            wsDiv.setAttribute('data-name', ws.fileName);
                             
                             const pathsHtml = ws.paths.map(p => '<div class="path-item">📁 ' + p + '</div>').join('');
                             
@@ -437,7 +483,8 @@ export class WorkspaceManagerPanel {
                                     <strong>\${ws.fileName}</strong>
                                     <div class="flex">
                                         <button class="btn-secondary btn-load" data-file="\${ws.fileName}">Load in VSCode</button>
-                                        <button class="btn-copy">Copy \${ws.paths.length} Paths</button>
+                                        <button class="btn-secondary btn-save" title="Save Current Open Workspace to this slot" data-file="\${ws.fileName}">Save</button>
+                                        <button class="btn-copy">Copy \${ws.copyPaths.length} Project Paths</button>
                                     </div>
                                 </div>
                                 <div class="path-list">
@@ -446,15 +493,30 @@ export class WorkspaceManagerPanel {
                             \`;
                             
                             wsDiv.querySelector('.btn-copy').addEventListener('click', () => {
-                                vscode.postMessage({ command: 'copyPaths', paths: ws.paths });
+                                vscode.postMessage({ command: 'copyPaths', paths: ws.copyPaths });
                             });
                             
                             wsDiv.querySelector('.btn-load').addEventListener('click', (e) => {
                                 vscode.postMessage({ command: 'loadWorkspace', fileName: e.target.dataset.file });
                             });
 
+                            wsDiv.querySelector('.btn-save').addEventListener('click', (e) => {
+                                vscode.postMessage({ command: 'saveCurrentTo', fileName: e.target.dataset.file });
+                            });
+
                             wsList.appendChild(wsDiv);
                         });
+
+                        const searchBox = document.getElementById('search-box');
+                        if (searchBox) {
+                            searchBox.addEventListener('input', (e) => {
+                                const term = e.target.value.toLowerCase();
+                                document.querySelectorAll('.workspace-item').forEach(item => {
+                                    const name = item.getAttribute('data-name').toLowerCase();
+                                    item.style.display = name.includes(term) ? 'block' : 'none';
+                                });
+                            });
+                        }
                     }
 
                     // Tell the extension we are ready to receive data

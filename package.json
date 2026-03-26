@@ -2,7 +2,7 @@
   "name": "antigravity-workspace-loader",
   "displayName": "Workspace Code-Loader",
   "description": "Loads folders from a .code-workspace file without breaking git worktrees.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "lengoc",
   "engines": {
     "vscode": "^1.80.0"
