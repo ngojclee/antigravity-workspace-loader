@@ -36,3 +36,10 @@
 - [x] Đóng gói thành công file `.vsix` mới nhất.
 - [x] Cập nhật lại `task.md` theo tiến độ.
 - [x] Cập nhật tài liệu hướng dẫn về workflow copy-paste vào Antigravity Agent Manager trong `README.md`.
+
+## Giai đoạn 6: Tích hợp Activity Bar & Mở rộng tính năng thao tác nhanh
+- [ ] Thiết lập Activity Bar (Side bar icon).
+- [ ] Dời/Mở rộng Workspace Manager sang dạng `WebviewView` để tương thích ở Sidebar hoặc sử dụng dạng TreeView click mở panel.
+- [ ] Lệnh `workspaceLoader.saveCurrentWorkspace` (Lưu đè cấu trúc workspace hiện thời sang file `.code-workspace` trong manager). Cần xử lý check file đã tồn tại và ask user to Overwrite.
+- [ ] Lệnh `workspaceLoader.quickCreateWorkspace` (Tạo nhánh workspace siêu nhanh): mở Folder dialog tại `mainProjectRoot` -> tự động combine các thư mục mặc định -> sinh file mới & lưu vào `.workspaces` -> chuyển workspace.
+- [ ] Cập nhật tài liệu và Release version.

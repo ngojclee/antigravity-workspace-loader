@@ -2,7 +2,7 @@
   "name": "antigravity-workspace-loader",
   "displayName": "Workspace Code-Loader",
   "description": "Loads folders from a .code-workspace file without breaking git worktrees.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "lengoc",
   "engines": {
     "vscode": "^1.80.0"
@@ -35,8 +35,36 @@
       {
         "command": "workspaceLoader.switchWorkspace",
         "title": "Antigravity Workspace: Switch Workspace"
+      },
+      {
+        "command": "workspaceLoader.saveCurrentWorkspace",
+        "title": "Antigravity Workspace: Save Current Workspace"
+      },
+      {
+        "command": "workspaceLoader.quickCreateWorkspace",
+        "title": "Antigravity Workspace: Quick Create Workspace"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "antigravityWorkspaceManager",
+          "title": "Antigravity Workspace",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "antigravityWorkspaceManager": [
+        {
+          "type": "webview",
+          "id": "workspaceLoader.managerView",
+          "name": "Manager Panel",
+          "icon": "media/icon.svg",
+          "contextualTitle": "Antigravity Workspace"
+        }
+      ]
+    },
     "menus": {
       "explorer/context": [
         {

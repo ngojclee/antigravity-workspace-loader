@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { WorkspaceManagerPanel } from './WorkspaceManagerPanel';
+import { WorkspaceManagerViewProvider } from './WorkspaceManagerViewProvider';
 
 async function openWorkspaceFile(
     targetUri: vscode.Uri,
@@ -98,6 +99,140 @@ export function activate(context: vscode.ExtensionContext) {
             WorkspaceManagerPanel.createOrShow(context.extensionUri);
         });
 
+        const saveCurrentWorkspaceDisposable = vscode.commands.registerCommand('workspaceLoader.saveCurrentWorkspace', async () => {
+            const config = vscode.workspace.getConfiguration('antigravityWorkspace');
+            const mainProjectRoot = config.get<string>('mainProjectRoot');
+            if (!mainProjectRoot || !fs.existsSync(mainProjectRoot)) {
+                void vscode.window.showErrorMessage('Main Project Root is not configured or invalid.');
+                return;
+            }
+
+            const workspacesDir = path.join(mainProjectRoot, '.workspaces');
+            if (!fs.existsSync(workspacesDir)) {
+                fs.mkdirSync(workspacesDir, { recursive: true });
+            }
+
+            const currentFolders = vscode.workspace.workspaceFolders;
+            if (!currentFolders || currentFolders.length === 0) {
+                void vscode.window.showInformationMessage('No folders currently open in workspace to save.');
+                return;
+            }
+
+            const defaultName = path.basename(currentFolders[0].uri.fsPath);
+            const inputName = await vscode.window.showInputBox({
+                prompt: 'Enter a name for the current workspace',
+                value: defaultName
+            });
+
+            if (!inputName) return;
+
+            const safeName = inputName.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const targetPath = path.join(workspacesDir, `${safeName}.code-workspace`);
+
+            if (fs.existsSync(targetPath)) {
+                const overwrite = await vscode.window.showWarningMessage(
+                    `Workspace "${safeName}" already exists. Overwrite?`,
+                    { modal: true },
+                    'Yes'
+                );
+                if (overwrite !== 'Yes') return;
+            }
+
+            const foldersData = currentFolders.map(f => {
+                let folderPath = f.uri.fsPath;
+                if (folderPath.startsWith(mainProjectRoot)) {
+                    folderPath = path.relative(mainProjectRoot, folderPath);
+                    folderPath = folderPath.replace(/\\/g, '/');
+                }
+                return { path: folderPath };
+            });
+
+            const workspaceJson = { folders: foldersData };
+            fs.writeFileSync(targetPath, JSON.stringify(workspaceJson, null, 4));
+
+            void vscode.window.showInformationMessage(`Workspace saved successfully as ${safeName}.code-workspace`);
+        });
+
+        const quickCreateWorkspaceDisposable = vscode.commands.registerCommand('workspaceLoader.quickCreateWorkspace', async () => {
+            const config = vscode.workspace.getConfiguration('antigravityWorkspace');
+            const mainProjectRoot = config.get<string>('mainProjectRoot');
+            const defaultDirs = config.get<string[]>('defaultAttachedDirectories') || [];
+
+            if (!mainProjectRoot || !fs.existsSync(mainProjectRoot)) {
+                void vscode.window.showErrorMessage('Main Project Root is not configured or invalid.');
+                return;
+            }
+
+            const targetUris = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                canSelectFolders: true,
+                canSelectFiles: false,
+                defaultUri: vscode.Uri.file(mainProjectRoot),
+                title: 'Select a Main Folder for the New Workspace'
+            });
+
+            if (!targetUris || targetUris.length === 0) return;
+
+            const selectedPath = targetUris[0].fsPath;
+            if (!selectedPath.startsWith(mainProjectRoot)) {
+                void vscode.window.showErrorMessage('Selected folder must be inside the Main Project Root.');
+                return;
+            }
+
+            const workspaceNameInput = await vscode.window.showInputBox({
+                prompt: 'Enter Workspace Name',
+                value: path.basename(selectedPath)
+            });
+
+            if (!workspaceNameInput) return;
+
+            const safeName = workspaceNameInput.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const relativeSelectedPath = path.relative(mainProjectRoot, selectedPath).replace(/\\/g, '/');
+
+            const foldersData = [{ path: relativeSelectedPath }];
+            
+            for (const dir of defaultDirs) {
+                if (dir.trim() !== '') {
+                    foldersData.push({ path: dir.replace(/\\/g, '/') });
+                }
+            }
+
+            const workspaceJson = { folders: foldersData, settings: {} };
+
+            const workspacesDir = path.join(mainProjectRoot, '.workspaces');
+            if (!fs.existsSync(workspacesDir)) {
+                fs.mkdirSync(workspacesDir, { recursive: true });
+            }
+
+            const targetPath = path.join(workspacesDir, `${safeName}.code-workspace`);
+
+            if (fs.existsSync(targetPath)) {
+                const overwrite = await vscode.window.showWarningMessage(
+                    `Workspace "${safeName}" already exists. Overwrite?`,
+                    { modal: true },
+                    'Yes'
+                );
+                if (overwrite !== 'Yes') return;
+            }
+
+            fs.writeFileSync(targetPath, JSON.stringify(workspaceJson, null, 4));
+
+            const switchNow = await vscode.window.showInformationMessage(
+                `Workspace "${safeName}" created. Switch to it now?`,
+                'Yes', 'No'
+            );
+
+            if (switchNow === 'Yes') {
+                await openWorkspaceFile(vscode.Uri.file(targetPath), output, 'workspaceLoader.quickCreateWorkspace');
+            }
+        });
+
+        const provider = new WorkspaceManagerViewProvider(context.extensionUri);
+        const viewProviderDisposable = vscode.window.registerWebviewViewProvider(
+            WorkspaceManagerViewProvider.viewType,
+            provider
+        );
+
         const switcherStatusBarBtn = vscode.window.createStatusBarItem(
             'antigravityWorkspace.switchWorkspace',
             vscode.StatusBarAlignment.Left,
@@ -126,6 +261,9 @@ export function activate(context: vscode.ExtensionContext) {
             loadDisposable,
             managerDisposable,
             switchDisposable,
+            saveCurrentWorkspaceDisposable,
+            quickCreateWorkspaceDisposable,
+            viewProviderDisposable,
             switcherStatusBarBtn,
             managerStatusBarBtn
         );
