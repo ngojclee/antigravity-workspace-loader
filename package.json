@@ -1,0 +1,87 @@
+{
+  "name": "antigravity-workspace-loader",
+  "displayName": "Workspace Code-Loader",
+  "description": "Loads folders from a .code-workspace file without breaking git worktrees.",
+  "version": "1.0.3",
+  "publisher": "lengoc",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "workspaceLoader.load",
+        "title": "Antigravity Workspace: Load Workspace from JSON"
+      },
+      {
+        "command": "workspaceLoader.openManager",
+        "title": "Antigravity Workspace: Open Manager"
+      },
+      {
+        "command": "workspaceLoader.switchWorkspace",
+        "title": "Antigravity Workspace: Switch Workspace"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "workspaceLoader.load",
+          "when": "resourceExtname == .code-workspace"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Antigravity Workspace Manager",
+      "properties": {
+        "antigravityWorkspace.mainProjectRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "Absolute path to the main project root folder that stores the .workspaces configuration."
+        },
+        "antigravityWorkspace.defaultAttachedDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "scope": "application",
+          "default": [
+            "docs",
+            "scripts"
+          ],
+          "description": "A list of relative folder paths to attach by default when creating a new workspace."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "18.x",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^2.19.0",
+    "typescript": "^5.1.3"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.2.0"
+  }
+}
