@@ -141,8 +141,8 @@ export function activate(context: vscode.ExtensionContext) {
             const foldersData = currentFolders.map(f => {
                 let folderPath = f.uri.fsPath;
                 if (folderPath.startsWith(mainProjectRoot)) {
-                    folderPath = path.relative(mainProjectRoot, folderPath);
-                    folderPath = folderPath.replace(/\\/g, '/');
+                    folderPath = path.relative(workspacesDir, folderPath);
+                    folderPath = folderPath.replace(/\\\\/g, '/');
                 }
                 return { path: folderPath };
             });
@@ -187,7 +187,8 @@ export function activate(context: vscode.ExtensionContext) {
             if (!workspaceNameInput) return;
 
             const safeName = workspaceNameInput.replace(/[^a-zA-Z0-9_-]/g, '_');
-            const relativeSelectedPath = path.relative(mainProjectRoot, selectedPath).replace(/\\/g, '/');
+            const workspacesDir = path.join(mainProjectRoot, '.workspaces');
+            const relativeSelectedPath = path.relative(workspacesDir, selectedPath).replace(/\\\\/g, '/');
 
             const foldersData = [{ path: relativeSelectedPath }];
             
@@ -199,7 +200,6 @@ export function activate(context: vscode.ExtensionContext) {
 
             const workspaceJson = { folders: foldersData, settings: {} };
 
-            const workspacesDir = path.join(mainProjectRoot, '.workspaces');
             if (!fs.existsSync(workspacesDir)) {
                 fs.mkdirSync(workspacesDir, { recursive: true });
             }
