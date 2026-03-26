@@ -133,8 +133,8 @@ export class WorkspaceManagerViewProvider implements vscode.WebviewViewProvider 
 
                             const copyPaths = absolutePaths.filter((p: string) => {
                                 return !defaultDirs.some(dir => {
-                                    const defaultFullPath = path.join(mainProjectRoot, dir);
-                                    return path.normalize(p) === path.normalize(defaultFullPath);
+                                    const defaultFullPath = path.resolve(mainProjectRoot, dir);
+                                    return path.normalize(p).toLowerCase() === path.normalize(defaultFullPath).toLowerCase();
                                 });
                             });
 
